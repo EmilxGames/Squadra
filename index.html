@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Squadra · Assetto ruote</title>
+<meta name="theme-color" content="#14171c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Squadra">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+/* Strumento da officina: grafite scura, giallo "sodio" per i dati, blu acciaio per i riferimenti */
+:root{
+  --bg:#14171c; --panel:#1c2027; --panel2:#252a33; --line:#323844;
+  --fg:#e9ecf1; --muted:#8d95a3; --accent:#f2c14e; --steel:#6ea8d8;
+  --ok:#5cc28a; --bad:#ef6b5b; --thrust:#c88cf0;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);-webkit-tap-highlight-color:transparent}
+body{padding:env(safe-area-inset-top) max(14px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 20px) max(14px,env(safe-area-inset-left));min-height:100vh}
+[hidden]{display:none!important}
+h1,h2,h3{margin:0;text-wrap:balance}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+input,select{font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%;font-family:var(--mono)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{display:flex;align-items:center;justify-content:space-between;padding:12px 0 8px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand b{font-size:20px;letter-spacing:.5px}
+.brand small{display:block;color:var(--muted);font-size:12px}
+.iconbtn{background:var(--panel);border:1px solid var(--line);width:40px;height:40px;border-radius:12px;display:grid;place-items:center}
+.iconbtn svg{width:20px;height:20px;stroke:var(--fg);fill:none;stroke-width:2}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.label{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn.primary{background:var(--accent);color:#1b1608;border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.45}
+.row{display:flex;gap:10px}
+.row>*{flex:1;min-width:0}
+.tabs{display:flex;background:var(--panel2);border-radius:12px;padding:3px;gap:3px}
+.tabs button{flex:1;background:transparent;padding:8px;border-radius:9px;font-size:13px;color:var(--muted)}
+.tabs button.on{background:var(--panel);color:var(--fg)}
+#car svg{width:100%;height:auto;display:block}
+.steps{display:flex;flex-direction:column}
+.step{display:flex;align-items:center;gap:12px;padding:11px 2px;border-top:1px solid var(--line)}
+.step:first-child{border-top:0}
+.dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;place-items:center;font-size:12px}
+.dot.done{background:var(--ok);border-color:var(--ok);color:#0d1f15}
+.dot.warn{background:var(--accent);border-color:var(--accent);color:#1b1608}
+.step .t{flex:1;min-width:0}
+.step .t div:last-child{color:var(--muted);font-size:12px}
+.step .v{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:right}
+.step button{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-weight:500;color:var(--muted);font-size:11px;letter-spacing:1px;text-transform:uppercase;text-align:right;padding:6px 4px}
+th:first-child,td:first-child{text-align:left}
+td{padding:9px 4px;border-top:1px solid var(--line);text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+td:first-child{font-family:var(--sans)} td.ok{color:var(--ok)} td.bad{color:var(--bad)}
+.note{font-size:13px;color:var(--muted);line-height:1.5}
+.note b{color:var(--fg)}
+.warnbox{border:1px solid #6b5420;background:#2a2414;color:#f5dd9c;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.45}
+/* schermata di misura */
+#measure{position:fixed;inset:0;background:var(--bg);z-index:20;overflow:auto;padding:calc(env(safe-area-inset-top) + 10px) max(14px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 16px) max(14px,env(safe-area-inset-left))}
+.mhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.mhead h2{font-size:18px}
+.pill{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 9px;color:var(--accent)}
+.gauge{display:grid;place-items:center;padding:8px 0}
+.gauge svg{width:min(78vw,300px);height:auto}
+.big{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:-1px}
+.readings{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.readings .panel{padding:10px 12px}
+.readings .num{font-size:22px;margin-top:2px}
+.status{text-align:center;font-weight:600;padding:10px;border-radius:12px;background:var(--panel2)}
+.status.go{background:#173326;color:var(--ok)}
+.status.hold{background:#2a2414;color:var(--accent)}
+.bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .1s}
+.how{display:flex;gap:12px;align-items:center}
+.how svg{width:84px;flex:none}
+.sheet{position:fixed;inset:0;background:var(--bg);z-index:15;overflow:auto;padding:calc(env(safe-area-inset-top) + 10px) max(14px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 20px) max(14px,env(safe-area-inset-left))}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.hist{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.hist:first-child{border-top:0}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);justify-content:center}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+</style>
+</head>
+<body>
+
+<!-- ============ HOME ============ -->
+<main id="home" class="stack">
+  <div class="top">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1c2027"/><path d="M14 50V14h8v28h28v8z" fill="#f2c14e"/><path d="M30 36l14-22" stroke="#6ea8d8" stroke-width="5" stroke-linecap="round"/></svg>
+      <div><b>Squadra</b><small>Assetto ruote col telefono</small></div>
+    </div>
+    <div class="row" style="flex:none;gap:8px">
+      <button class="iconbtn" id="btnHist" aria-label="Archivio"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+      <button class="iconbtn" id="btnSet" aria-label="Impostazioni"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button>
+    </div>
+  </div>
+
+  <div id="sensorWarn" class="warnbox" hidden></div>
+
+  <section class="panel" id="car">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span class="label">Vista dall'alto · angoli ×10</span>
+      <input id="carName" placeholder="Nome auto" style="max-width:150px;padding:6px 9px;font-size:13px;font-family:var(--sans)">
+    </div>
+    <div id="carSvg"></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Ruota</span><span><i style="background:var(--thrust)"></i>Linea di spinta</span><span><i style="background:var(--steel)"></i>Asse vettura</span></div>
+  </section>
+
+  <section class="panel">
+    <div class="row" style="align-items:center;margin-bottom:8px">
+      <span class="label">Risultati</span>
+      <div class="tabs" style="flex:none">
+        <button id="uDeg" class="on">gradi</button><button id="uMm">mm</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto"><table id="results"></table></div>
+    <div id="resNotes" class="note" style="margin-top:8px"></div>
+  </section>
+
+  <section class="panel">
+    <div class="label" style="margin-bottom:4px">Procedura guidata</div>
+    <div class="steps" id="steps"></div>
+  </section>
+
+  <button class="btn primary" id="btnNext">Inizia misurazione</button>
+  <div class="row">
+    <button class="btn" id="btnString">Metodo del filo</button>
+    <button class="btn" id="btnSave">Salva misura</button>
+  </div>
+  <div class="row">
+    <button class="btn ghost" id="btnGuide">Come misurare bene</button>
+    <button class="btn ghost" id="btnReset">Azzera tutto</button>
+  </div>
+  <div id="resetConfirm" class="panel" hidden>
+    <p class="note" style="margin:0 0 10px">Cancellare tutte le misure correnti? L'archivio resta.</p>
+    <div class="row"><button class="btn" id="resetNo">Annulla</button><button class="btn primary" id="resetYes">Cancella</button></div>
+  </div>
+</main>
+
+<!-- ============ MISURA ============ -->
+<section id="measure" hidden>
+  <div class="mhead">
+    <button class="iconbtn" id="mClose" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="mTitle">Misura</h2><span class="pill" id="mPill">AS</span>
+  </div>
+  <div class="stack">
+    <div class="panel how"><div id="mPic"></div><div class="note" id="mHow"></div></div>
+    <div class="gauge"><svg id="gauge" viewBox="0 0 300 300"></svg></div>
+    <div class="readings" id="mRead"></div>
+    <div class="bar"><i id="mBar"></i></div>
+    <div class="status" id="mStatus">Premi «Acquisisci»</div>
+    <button class="btn primary" id="mGo">Acquisisci</button>
+    <button class="btn ghost" id="mSkip" hidden>Salta questo passaggio</button>
+  </div>
+</section>
+
+<!-- ============ FILO ============ -->
+<section id="string" class="sheet" hidden>
+  <div class="mhead"><button class="iconbtn" data-close aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><h2>Metodo del filo</h2></div>
+  <div class="stack">
+    <p class="note">Il metodo più preciso per la convergenza (±0,05°). Tendi un filo su ciascun lato dell'auto, parallelo all'asse, all'altezza del mozzo. Misura con un metro la distanza dal filo al <b>bordo del cerchio davanti</b> e <b>dietro</b> il mozzo. I fili sono paralleli quando la distanza dal centro dei mozzi è uguale davanti e dietro.</p>
+    <div class="field"><label for="sRim">Diametro del cerchio (pollici)</label><input id="sRim" type="number" inputmode="decimal" step="0.5" value="17"></div>
+    <div class="grid2" id="sGrid"></div>
+    <div class="panel"><table id="sOut"></table></div>
+  </div>
+</section>
+
+<!-- ============ IMPOSTAZIONI ============ -->
+<section id="settings" class="sheet" hidden>
+  <div class="mhead"><button class="iconbtn" data-close aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><h2>Impostazioni</h2></div>
+  <div class="stack">
+    <div class="field"><label for="setRim">Diametro cerchio (pollici), per convertire la convergenza in mm</label><input id="setRim" type="number" inputmode="decimal" step="0.5"></div>
+    <div class="label">Valori di riferimento del costruttore (lascia vuoto se non li hai)</div>
+    <div class="grid2" id="specGrid"></div>
+    <p class="note">La convergenza è per singola ruota, in gradi. Positivo = convergente (punta verso l'interno). Campanatura negativa = parte alta verso l'interno.</p>
+  </div>
+</section>
+
+<!-- ============ ARCHIVIO ============ -->
+<section id="history" class="sheet" hidden>
+  <div class="mhead"><button class="iconbtn" data-close aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><h2>Archivio misure</h2></div>
+  <div class="panel" id="histList"></div>
+</section>
+
+<!-- ============ GUIDA ============ -->
+<section id="guide" class="sheet" hidden>
+  <div class="mhead"><button class="iconbtn" data-close aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><h2>Come misurare bene</h2></div>
+  <div class="stack note" style="font-size:14px">
+    <div class="panel"><b>Cosa ti serve.</b> Una tavoletta piatta e rigida (compensato o alluminio, circa 40×10 cm) da appoggiare sul bordo del cerchio, in modo che tocchi il labbro del cerchio in due punti opposti. Il telefono si appoggia di schiena sulla tavoletta, in orizzontale (landscape). Senza tavoletta le razze e la bombatura del cerchio falsano la misura.</div>
+    <div class="panel"><b>Prepara l'auto.</b> Pavimento il più piano possibile, gomme alla pressione giusta, sterzo dritto e volante bloccato. Fai fare all'auto un metro avanti e indietro prima di misurare, così le sospensioni si assestano.</div>
+    <div class="panel"><b>Fai tutto in una volta.</b> La convergenza si calcola confrontando la direzione di ogni ruota. Il giroscopio del telefono deriva lentamente, quindi misura le quattro ruote di seguito (2–3 minuti) senza chiudere l'app né bloccare lo schermo. L'ultimo passaggio rimisura la prima ruota per correggere la deriva.</div>
+    <div class="panel"><b>Precisione realistica.</b> Campanatura: ±0,1° circa. Convergenza coi sensori: ±0,2–0,3° con tavoletta e mano ferma, utile per capire se qualcosa è storto e per regolazioni approssimative. Per regolare la convergenza in modo fine usa il <b>metodo del filo</b>, che l'app calcola per te. Per un'auto da strada, dopo una regolazione importante, un controllo in officina resta consigliato.</div>
+    <div class="panel"><b>Eccentricità del cerchio.</b> Se un cerchio è un po' storto, misura, sposta l'auto di mezzo giro di ruota e rimisura: la media delle due letture è il valore vero.</div>
+  </div>
+</section>
+
+<script>
+"use strict";
+/* ---------------- stato ---------------- */
+const CORNERS={FL:{it:"Anteriore sinistra",ab:"AS",side:"L"},FR:{it:"Anteriore destra",ab:"AD",side:"R"},RR:{it:"Posteriore destra",ab:"PD",side:"R"},RL:{it:"Posteriore sinistra",ab:"PS",side:"L"}};
+const SID=Date.now().toString(36)+Math.random().toString(36).slice(2,6); // sessione giroscopio
+const DEF_SPECS={fToeMin:"",fToeMax:"",fCamMin:"",fCamMax:"",rToeMin:"",rToeMax:"",rCamMin:"",rCamMax:""};
+let S=load("squadra.state",{floor:null,center:null,wheels:{},check:null,car:""});
+let SET=load("squadra.settings",{rim:17,unit:"deg",specs:{...DEF_SPECS}});
+function load(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v?Object.assign(d,v):d}catch(e){return d}}
+function save(){try{localStorage.setItem("squadra.state",JSON.stringify(S));localStorage.setItem("squadra.settings",JSON.stringify(SET))}catch(e){}}
+
+/* ---------------- matematica ---------------- */
+const D=Math.PI/180;
+const wrap=a=>{a=((a+180)%360+360)%360-180;return a===-180?180:a};
+const avgAng=(a,b)=>a+wrap(b-a)/2;
+// matrice di rotazione W3C (Z-X'-Y''): vettore dispositivo -> terra (x est, y nord, z su)
+function rotM(al,be,ga){
+  const cA=Math.cos(al*D),sA=Math.sin(al*D),cB=Math.cos(be*D),sB=Math.sin(be*D),cG=Math.cos(ga*D),sG=Math.sin(ga*D);
+  return [[cA*cG-sA*sB*sG,-cB*sA,cA*sG+cG*sA*sB],[cG*sA+cA*sB*sG,cA*cB,sA*sG-cA*cG*sB],[-cB*sG,sB,cB*cG]];
+}
+// da campione: n = normale allo schermo, x = asse lungo/destra del telefono
+function derive(n,x){
+  const nl=Math.hypot(n[0],n[1],n[2]);
+  const camber=-Math.asin(n[2]/nl)/D;                 // telefono con schermo verso l'esterno
+  const hn=Math.atan2(n[1],n[0])/D;                   // direzione orizzontale della normale
+  const xl=Math.hypot(x[0],x[1],x[2]);
+  const roll=Math.asin(x[2]/xl)/D;                    // telefono piatto: lato destro più alto = +
+  const pitch=Math.acos(Math.max(-1,Math.min(1,n[2]/nl)))/D; // quanto il telefono non è piatto
+  return {camber,hn,roll,pitch};
+}
+
+/* calcolo risultati */
+function compute(){
+  const W=S.wheels, out={wheel:{},notes:[]};
+  const floorPhi=S.floor?S.floor.roll:0;
+  for(const k in CORNERS){
+    const w=W[k]; if(!w) continue;
+    const sgn=CORNERS[k].side==="L"?-1:1;
+    out.wheel[k]={camber:w.camber+(S.floor?sgn*floorPhi:0)};
+  }
+  // gruppo di sessione: tutte le direzioni devono venire dalla stessa sessione del giroscopio
+  const base=W.FL||W.FR||W.RL||W.RR; if(!base) return out;
+  const sid=base.sid;
+  const same=k=>W[k]&&W[k].sid===sid;
+  const stale=Object.keys(W).filter(k=>!same(k));
+  if(stale.length) out.notes.push("Convergenza di "+stale.map(k=>CORNERS[k].ab).join(", ")+" non confrontabile: misurata in un'altra sessione dell'app. Rimisura tutte e quattro di seguito.");
+  // deriva lineare: dalla rimisura della prima ruota
+  let drift=0,t0=0;
+  if(S.check&&W.FL&&S.check.sid===sid&&same("FL")){
+    const dt=(S.check.t-W.FL.t)/1000;
+    if(dt>5){drift=wrap(S.check.hn-W.FL.hn)/dt;t0=W.FL.t;out.driftTot=wrap(S.check.hn-W.FL.hn);out.driftRate=drift*60}
+  }
+  const corr=(h,t)=>h-drift*(t-t0)/1000;
+  const hw={};
+  for(const k in CORNERS){ if(!same(k)) continue;
+    const h=corr(W[k].hn,W[k].t);
+    hw[k]=CORNERS[k].side==="L"?h-90:h+90; }
+  let center=null;
+  if(S.center&&S.center.sid===sid) center=corr(S.center.hn,S.center.t)-90;
+  else if(S.center) out.notes.push("Riferimento asse misurato in un'altra sessione: ignorato.");
+  let thrust=null;
+  if(hw.RL!=null&&hw.RR!=null) thrust=avgAng(hw.RL,hw.RR);
+  const toe=(k,ref)=>CORNERS[k].side==="L"?-wrap(hw[k]-ref):wrap(hw[k]-ref);
+  // posteriori: rispetto all'asse vettura (o alla linea di spinta se l'asse manca)
+  const rRef=center!=null?center:thrust;
+  if(rRef!=null) for(const k of ["RL","RR"]) if(hw[k]!=null) out.wheel[k].toe=toe(k,rRef);
+  if(thrust!=null){ out.totalR=wrap(hw.RR-hw.RL);
+    if(center!=null) out.thrustAngle=wrap(thrust-center); else out.notes.push("Senza riferimento asse, la convergenza posteriore è divisa a metà tra le due ruote e l'angolo di spinta non è misurabile."); }
+  // anteriori: rispetto alla linea di spinta (standard d'officina), altrimenti asse
+  const fRef=thrust!=null?thrust:center;
+  if(fRef!=null) for(const k of ["FL","FR"]) if(hw[k]!=null) out.wheel[k].toe=toe(k,fRef);
+  if(hw.FL!=null&&hw.FR!=null) out.totalF=wrap(hw.FR-hw.FL);
+  if(fRef==null&&out.totalF!=null) out.notes.push("Misura le posteriori per avere la convergenza della singola ruota anteriore.");
+  if(out.driftTot!=null&&Math.abs(out.driftTot)>0.6) out.notes.push("Deriva alta ("+fmt(out.driftTot)+"°): rifai il giro più in fretta e tenendo fermo il telefono.");
+  out.thrust=thrust;out.center=center;out.hw=hw;
+  return out;
+}
+
+/* ---------------- formattazione ---------------- */
+const fmt=(v,d=2)=>v==null||isNaN(v)?"—":(v>0?"+":v<0?"−":"")+Math.abs(v).toFixed(d).replace(".",",");
+const rimMm=()=>(+SET.rim||17)*25.4;
+const toeMm=deg=>Math.tan(deg*D)*rimMm();
+function fmtToe(v){ if(v==null) return "—"; return SET.unit==="mm"?fmt(toeMm(v),1)+" mm":fmt(v)+"°"; }
+function inSpec(v,min,max){ if(v==null) return ""; const a=parseFloat(String(min).replace(",",".")),b=parseFloat(String(max).replace(",","."));
+  if(isNaN(a)&&isNaN(b)) return ""; if((!isNaN(a)&&v<a)||(!isNaN(b)&&v>b)) return "bad"; return "ok"; }
+
+/* ---------------- rendering home ---------------- */
+const $=id=>document.getElementById(id);
+function render(){
+  const R=compute();
+  $("carName").value=S.car||"";
+  $("uDeg").classList.toggle("on",SET.unit==="deg");$("uMm").classList.toggle("on",SET.unit==="mm");
+  renderCar(R);
+  // tabella
+  const sp=SET.specs;
+  let h="<tr><th>Ruota</th><th>Convergenza</th><th>Campanatura</th></tr>";
+  for(const k of ["FL","FR","RL","RR"]){
+    const w=R.wheel[k]||{}; const front=k[0]==="F";
+    const ct=inSpec(w.toe,front?sp.fToeMin:sp.rToeMin,front?sp.fToeMax:sp.rToeMax);
+    const cc=inSpec(w.camber,front?sp.fCamMin:sp.rCamMin,front?sp.fCamMax:sp.rCamMax);
+    h+=`<tr><td>${CORNERS[k].it}</td><td class="${ct}">${fmtToe(w.toe)}</td><td class="${cc}">${fmt(w.camber)}${w.camber!=null?"°":""}</td></tr>`;
+  }
+  h+=`<tr><td>Totale anteriore</td><td>${fmtToe(R.totalF)}</td><td></td></tr>`;
+  h+=`<tr><td>Totale posteriore</td><td>${fmtToe(R.totalR)}</td><td></td></tr>`;
+  h+=`<tr><td>Angolo di spinta</td><td>${R.thrustAngle!=null?fmt(R.thrustAngle)+"°":"—"}</td><td></td></tr>`;
+  $("results").innerHTML=h;
+  let n=R.notes.slice();
+  if(R.driftTot!=null) n.unshift("Deriva giroscopio corretta: "+fmt(R.driftTot)+"° in totale.");
+  n.push("Convergenza: + convergente, − divergente. In mm è riferita al diametro del cerchio ("+SET.rim+"\").");
+  $("resNotes").innerHTML=n.map(s=>"<div>"+s+"</div>").join("");
+  // passi
+  const steps=flow();
+  $("steps").innerHTML=steps.map((s,i)=>{const st=s.done?"done":"";return `<div class="step"><span class="dot ${st}">${s.done?"✓":i+1}</span><div class="t"><div>${s.title}${s.opt?' <span class="label">facoltativo</span>':""}</div><div>${s.sub}</div></div><span class="v">${s.val||""}</span><button data-step="${s.id}">${s.done?"Rifai":"Misura"}</button></div>`}).join("");
+  const nx=steps.find(s=>!s.done&&!s.opt)||null;
+  $("btnNext").textContent=nx?(Object.keys(S.wheels).length?"Continua: "+nx.title:"Inizia misurazione"):"Misurazione completa";
+  $("btnNext").disabled=!nx;
+}
+function flow(){
+  const W=S.wheels;
+  const st=[
+    {id:"floor",title:"Pendenza del pavimento",sub:"Telefono piatto a terra, punta verso il muso",opt:true,done:!!S.floor,val:S.floor?fmt(S.floor.roll)+"°":""},
+    {id:"center",title:"Riferimento asse vettura",sub:"Contro una riga parallela all'auto, lato sinistro",opt:true,done:!!S.center},
+  ];
+  for(const k of ["FL","FR","RR","RL"]) st.push({id:k,title:CORNERS[k].it,sub:"Telefono sulla tavoletta, schermo verso l'esterno",done:!!W[k],val:W[k]?fmt(W[k].camber)+"°":""});
+  st.push({id:"check",title:"Ricontrollo anteriore sinistra",sub:"Corregge la deriva del giroscopio",done:!!S.check});
+  return st;
+}
+function renderCar(R){
+  const k=10, W=R.wheel;
+  const cx=200, yF=120, yR=330;
+  const wheel=(k2,x,y)=>{
+    const w=W[k2]; const t=w&&w.toe!=null?w.toe:0; const L=CORNERS[k2].side==="L";
+    const rot=(L?1:-1)*t*k; const has=!!S.wheels[k2];
+    const lbx=L?x-22:x+22, anc=L?"end":"start";
+    const toeTxt=w&&w.toe!=null?fmtToe(w.toe):"—", camTxt=w?fmt(w.camber)+"°":"—";
+    return `<g transform="rotate(${rot.toFixed(2)} ${x} ${y})"><rect x="${x-12}" y="${y-32}" width="24" height="64" rx="6" fill="${has?"#2a2f38":"#1f232a"}" stroke="${has?"var(--accent)":"var(--line)"}" stroke-width="2"/>
+      <line x1="${x}" y1="${y-52}" x2="${x}" y2="${y+52}" stroke="${has?"var(--accent)":"transparent"}" stroke-width="1.5" stroke-dasharray="3 3"/></g>
+      <text x="${lbx}" y="${y-8}" text-anchor="${anc}" font-size="12" fill="var(--muted)" font-family="var(--sans)">${CORNERS[k2].ab} conv.</text>
+      <text x="${lbx}" y="${y+8}" text-anchor="${anc}" font-size="14" fill="var(--fg)" font-family="var(--mono)">${toeTxt}</text>
+      <text x="${lbx}" y="${y+26}" text-anchor="${anc}" font-size="12" fill="var(--muted)" font-family="var(--mono)">camp. ${camTxt}</text>`;
+  };
+  let th="";
+  if(R.thrustAngle!=null||R.thrust!=null){
+    const a=(R.thrustAngle||0)*k*D; const len=290;
+    th=`<line x1="${cx}" y1="${yR}" x2="${(cx-Math.sin(a)*len).toFixed(1)}" y2="${(yR-Math.cos(a)*len).toFixed(1)}" stroke="var(--thrust)" stroke-width="2.5"/>`;
+  }
+  $("carSvg").innerHTML=`<svg viewBox="0 0 400 450" role="img" aria-label="Schema auto vista dall'alto">
+   <line x1="${cx}" y1="18" x2="${cx}" y2="440" stroke="var(--steel)" stroke-width="1.2" stroke-dasharray="6 5"/>
+   <path d="M${cx-62} 60 Q${cx} 22 ${cx+62} 60 L${cx+66} 380 Q${cx} 410 ${cx-66} 380 Z" fill="#20252d" stroke="var(--line)" stroke-width="2"/>
+   <rect x="${cx-46}" y="150" width="92" height="70" rx="12" fill="#262c35" stroke="var(--line)"/>
+   <rect x="${cx-42}" y="250" width="84" height="56" rx="12" fill="#262c35" stroke="var(--line)"/>
+   <line x1="${cx-72}" y1="${yF}" x2="${cx+72}" y2="${yF}" stroke="var(--line)" stroke-width="3"/>
+   <line x1="${cx-72}" y1="${yR}" x2="${cx+72}" y2="${yR}" stroke="var(--line)" stroke-width="3"/>
+   ${th}
+   ${wheel("FL",cx-76,yF)}${wheel("FR",cx+76,yF)}${wheel("RL",cx-76,yR)}${wheel("RR",cx+76,yR)}
+   <text x="${cx}" y="14" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--sans)" letter-spacing="1.5">FRONTE</text>
+  </svg>`;
+}
+
+/* ---------------- sensori ---------------- */
+let live=null, lastEvt=0, sensorOK=false, buf=[];
+function onOri(e){
+  if(e.alpha==null||e.beta==null||e.gamma==null) return;
+  const M=rotM(e.alpha,e.beta,e.gamma);
+  const n=[M[0][2],M[1][2],M[2][2]], x=[M[0][0],M[1][0],M[2][0]];
+  const now=performance.now();
+  live={n,x,...derive(n,x),t:now}; lastEvt=now; sensorOK=true;
+  buf.push(live); while(buf.length&&now-buf[0].t>1000) buf.shift();
+  if(M_ON) tick();
+}
+async function ensureSensors(){
+  try{
+    if(typeof DeviceOrientationEvent!=="undefined"&&typeof DeviceOrientationEvent.requestPermission==="function"){
+      const r=await DeviceOrientationEvent.requestPermission(); if(r!=="granted"){showWarn("Permesso sensori negato. Chiudi e riapri l'app e tocca «Consenti» quando richiesto.");return false}
+    }
+  }catch(err){showWarn("Non riesco a chiedere il permesso dei sensori: "+err.message);return false}
+  if(!window._oriOn){window.addEventListener("deviceorientation",onOri);window._oriOn=true}
+  return true;
+}
+function showWarn(t){$("sensorWarn").textContent=t;$("sensorWarn").hidden=!t}
+if(!window.isSecureContext) showWarn("Apri l'app da un indirizzo https, altrimenti il telefono non dà accesso ai sensori.");
+
+/* ---------------- schermata di misura ---------------- */
+let M_ON=false, MODE=null, phase="idle", acc=null, accStart=0, countEnd=0, wakeLock=null, audio=null;
+const STAB=0.06, HOLD_MS=1500, COUNT_MS=3000;
+const PICS={
+ wheel:`<svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="36" fill="none" stroke="#8d95a3" stroke-width="5"/><circle cx="42" cy="42" r="26" fill="none" stroke="#323844" stroke-width="3"/><rect x="8" y="35" width="68" height="14" rx="3" fill="#6ea8d8"/><rect x="20" y="29" width="44" height="26" rx="5" fill="#14171c" stroke="#f2c14e" stroke-width="2.5"/></svg>`,
+ floor:`<svg viewBox="0 0 84 84"><path d="M6 66h72" stroke="#8d95a3" stroke-width="3"/><rect x="26" y="20" width="32" height="44" rx="6" fill="#14171c" stroke="#f2c14e" stroke-width="2.5"/><path d="M42 30v-16m-6 6l6-6 6 6" stroke="#6ea8d8" stroke-width="3" fill="none"/></svg>`
+};
+function openMeasure(id){
+  MODE=id; M_ON=true; phase="idle";
+  const isW=!!CORNERS[id]||id==="check"||id==="center";
+  const c=CORNERS[id==="check"?"FL":id];
+  $("mTitle").textContent=id==="floor"?"Pendenza pavimento":id==="center"?"Riferimento asse":id==="check"?"Ricontrollo AS":c.it;
+  $("mPill").textContent=id==="floor"?"PAV":id==="center"?"ASSE":id==="check"?"AS·2":c.ab;
+  $("mPic").innerHTML=isW?PICS.wheel:PICS.floor;
+  $("mHow").innerHTML=id==="floor"?"Appoggia il telefono <b>piatto a terra</b>, schermo in su, con la parte alta verso il <b>muso</b> dell'auto, vicino al centro della vettura."
+    :id==="center"?"Appoggia la <b>schiena</b> del telefono, in orizzontale, contro una riga dritta <b>parallela all'asse</b> dell'auto sul lato <b>sinistro</b>, schermo verso l'esterno (es. un'asta a pari distanza dai punti simmetrici del telaio)."
+    :"Appoggia la tavoletta sul <b>bordo del cerchio</b> all'altezza del mozzo, poi la <b>schiena</b> del telefono sulla tavoletta, in orizzontale, schermo verso l'<b>esterno</b>. Tieni fermo finché senti il bip.";
+  $("mSkip").hidden=!(id==="floor"||id==="center");
+  $("mGo").textContent="Acquisisci";$("mGo").disabled=false;
+  $("measure").hidden=false;
+  try{navigator.wakeLock&&navigator.wakeLock.request("screen").then(l=>wakeLock=l).catch(()=>{})}catch(e){}
+  drawGauge(); tick();
+  setTimeout(()=>{ if(M_ON&&!sensorOK) setStatus("Nessun dato dai sensori. Questo dispositivo non li espone, o il permesso è stato negato.","hold") },2000);
+}
+function closeMeasure(){M_ON=false;phase="idle";$("measure").hidden=true;try{wakeLock&&wakeLock.release()}catch(e){};render()}
+function setStatus(t,cls){const s=$("mStatus");s.textContent=t;s.className="status "+(cls||"")}
+function std(a){const m=a.reduce((p,c)=>p+c,0)/a.length;return Math.sqrt(a.reduce((p,c)=>p+(c-m)*(c-m),0)/a.length)}
+function stable(){
+  if(buf.length<15) return false;
+  const h0=buf[0].hn;
+  if(MODE==="floor") return std(buf.map(b=>b.roll))<STAB&&std(buf.map(b=>b.pitch))<STAB;
+  return std(buf.map(b=>b.camber))<STAB&&std(buf.map(b=>wrap(b.hn-h0)))<STAB;
+}
+function beep(f=880,ms=120){try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=f;g.gain.value=.15;o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+ms/1000)}catch(e){} try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}}
+function tick(){
+  if(!M_ON) return;
+  const L=live; const now=performance.now();
+  // letture
+  let r="";
+  if(MODE==="floor") r=`<div class="panel"><div class="label">Pendenza laterale</div><div class="num">${L?fmt(L.roll)+"°":"—"}</div></div><div class="panel"><div class="label">Planarità telefono</div><div class="num">${L?(L.pitch).toFixed(1).replace(".",",")+"°":"—"}</div></div>`;
+  else{ const vert=L?Math.abs(L.camber):null;
+    r=`<div class="panel"><div class="label">Campanatura live</div><div class="num">${L?fmt(L.camber)+"°":"—"}</div></div><div class="panel"><div class="label">Direzione relativa</div><div class="num">${L&&S.wheels.FL&&S.wheels.FL.sid===SID?fmt(wrap(L.hn-S.wheels.FL.hn+(CORNERS[MODE]&&CORNERS[MODE].side==="R"?180:0)))+"°":"—"}</div></div>`;
+    if(L&&vert>15) r+=`<div class="panel" style="grid-column:1/-1;color:var(--accent)">Il telefono non è verticale: appoggialo di schiena sulla ruota.</div>`; }
+  $("mRead").innerHTML=r;
+  drawGauge(L);
+  // fasi
+  if(phase==="count"){
+    const left=Math.ceil((countEnd-now)/1000);
+    setStatus("Posiziona il telefono… "+Math.max(left,0),"hold");
+    if(now>=countEnd){phase="wait";}
+  }
+  if(phase==="wait"||phase==="acq"){
+    if(!stable()){ if(phase==="acq") {phase="wait";acc=null} setStatus("Tieni fermo il telefono","hold"); $("mBar").style.width="0"; }
+    else{
+      if(phase==="wait"){phase="acq";acc={n:[0,0,0],x:[0,0,0],k:0};accStart=now}
+      if(L&&L!==acc.last){ for(let i=0;i<3;i++){acc.n[i]+=L.n[i];acc.x[i]+=L.x[i]} acc.k++; acc.last=L; }
+      const p=Math.min(1,(now-accStart)/HOLD_MS); $("mBar").style.width=(p*100)+"%";
+      setStatus("Acquisizione… "+Math.round(p*100)+"%","go");
+      if(p>=1) finish();
+    }
+  }
+}
+function startCapture(){
+  ensureSensors().then(ok=>{ if(!ok) return;
+    try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();audio.resume()}catch(e){}
+    phase="count";countEnd=performance.now()+COUNT_MS;$("mGo").disabled=true;buf=[];tick();
+    const loop=()=>{ if(M_ON&&(phase==="count"||phase==="wait"||phase==="acq")){ tick(); setTimeout(loop,100);} }; loop();
+  });
+}
+function finish(){
+  phase="done";
+  const n=acc.n.map(v=>v/acc.k), x=acc.x.map(v=>v/acc.k); const d=derive(n,x); const t=Date.now();
+  if(MODE==="floor") S.floor={roll:d.roll,t};
+  else if(MODE==="center") S.center={hn:d.hn,t,sid:SID};
+  else if(MODE==="check") S.check={hn:d.hn,camber:d.camber,t,sid:SID};
+  else S.wheels[MODE]={camber:d.camber,hn:d.hn,t,sid:SID};
+  if(MODE!=="check"&&MODE!=="floor"&&MODE!=="center"&&MODE==="FL") S.check=null;
+  save(); beep(1046,160);
+  setStatus("Acquisito ✓","go"); $("mBar").style.width="100%";
+  setTimeout(()=>{ const nx=nextAfter(MODE); if(nx&&M_ON){openMeasure(nx)} else closeMeasure() },900);
+}
+function drawGauge(L){
+  const g=$("gauge"); const v=L?(MODE==="floor"?L.roll:L.camber):0; const big=L?fmt(v)+"°":"—";
+  const ang=Math.max(-45,Math.min(45,v*15)); // 1° = 15° di scala
+  let ticks="";
+  for(let i=-3;i<=3;i++){const a=(i*15-90)*D, r1=118, r2=i%1===0?(i===0?96:104):110;
+    ticks+=`<line x1="${150+Math.cos(a)*r1}" y1="${170+Math.sin(a)*r1}" x2="${150+Math.cos(a)*r2}" y2="${170+Math.sin(a)*r2}" stroke="${i===0?"var(--accent)":"var(--muted)"}" stroke-width="2"/>
+    <text x="${150+Math.cos(a)*134}" y="${174+Math.sin(a)*134}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--mono)">${i>0?"+":""}${i}</text>`;}
+  const a=(ang-90)*D;
+  g.innerHTML=`<path d="M${150+Math.cos(-135*D)*118} ${170+Math.sin(-135*D)*118} A118 118 0 0 1 ${150+Math.cos(-45*D)*118} ${170+Math.sin(-45*D)*118}" fill="none" stroke="var(--line)" stroke-width="10" stroke-linecap="round"/>
+  ${ticks}<line x1="150" y1="170" x2="${150+Math.cos(a)*112}" y2="${170+Math.sin(a)*112}" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/><circle cx="150" cy="170" r="7" fill="var(--accent)"/>
+  <text x="150" y="232" text-anchor="middle" class="big" fill="var(--fg)" font-family="var(--mono)" font-size="44" font-weight="600">${big}</text>
+  <text x="150" y="258" text-anchor="middle" font-size="12" fill="var(--muted)" letter-spacing="1.5" font-family="var(--sans)">${MODE==="floor"?"PENDENZA LATERALE":"CAMPANATURA"}</text>`;
+}
+
+/* ---------------- metodo del filo ---------------- */
+function renderString(){
+  const keys=["FL","FR","RL","RR"]; const sv=load("squadra.string",{});
+  if(!$("sGrid").dataset.built){
+    $("sGrid").innerHTML=keys.map(k=>`<div class="panel" style="padding:10px"><div class="label">${CORNERS[k].it}</div>
+    <div class="field" style="margin-top:6px"><label for="s${k}f">Filo → cerchio davanti (mm)</label><input id="s${k}f" type="number" inputmode="decimal" step="0.5"></div>
+    <div class="field" style="margin-top:6px"><label for="s${k}r">Filo → cerchio dietro (mm)</label><input id="s${k}r" type="number" inputmode="decimal" step="0.5"></div></div>`).join("");
+    keys.forEach(k=>{["f","r"].forEach(p=>{const el=$("s"+k+p);el.value=sv[k+p]??"";el.oninput=renderString})});
+    $("sRim").value=sv.rim??SET.rim; $("sRim").oninput=renderString; $("sGrid").dataset.built=1;
+  }
+  const rim=(parseFloat($("sRim").value)||17)*25.4; const o={rim:$("sRim").value}; const toe={};
+  keys.forEach(k=>{const f=parseFloat($("s"+k+"f").value),r=parseFloat($("s"+k+"r").value);o[k+"f"]=$("s"+k+"f").value;o[k+"r"]=$("s"+k+"r").value;
+    if(!isNaN(f)&&!isNaN(r)) toe[k]={deg:Math.atan((f-r)/rim)/D,mm:f-r};});
+  try{localStorage.setItem("squadra.string",JSON.stringify(o))}catch(e){}
+  const tot=(a,b)=>toe[a]&&toe[b]?{deg:toe[a].deg+toe[b].deg,mm:toe[a].mm+toe[b].mm}:null;
+  const row=(n,v)=>`<tr><td>${n}</td><td>${v?fmt(v.deg)+"°":"—"}</td><td>${v?fmt(v.mm,1)+" mm":"—"}</td></tr>`;
+  $("sOut").innerHTML="<tr><th>Convergenza</th><th>Gradi</th><th>Al cerchio</th></tr>"+keys.map(k=>row(CORNERS[k].it,toe[k])).join("")+row("Totale anteriore",tot("FL","FR"))+row("Totale posteriore",tot("RL","RR"));
+}
+
+/* ---------------- impostazioni ---------------- */
+function renderSettings(){
+  $("setRim").value=SET.rim; $("setRim").oninput=e=>{SET.rim=parseFloat(e.target.value)||17;save()};
+  const f=[["fToe","Conv. anteriore"],["fCam","Camp. anteriore"],["rToe","Conv. posteriore"],["rCam","Camp. posteriore"]];
+  $("specGrid").innerHTML=f.map(([k,l])=>`<div class="field"><label for="sp${k}Min">${l} min °</label><input id="sp${k}Min" inputmode="decimal" value="${SET.specs[k+"Min"]??""}"></div><div class="field"><label for="sp${k}Max">${l} max °</label><input id="sp${k}Max" inputmode="decimal" value="${SET.specs[k+"Max"]??""}"></div>`).join("");
+  f.forEach(([k])=>["Min","Max"].forEach(m=>{$("sp"+k+m).oninput=e=>{SET.specs[k+m]=e.target.value;save()}}));
+}
+
+/* ---------------- archivio ---------------- */
+function renderHist(){
+  const H=load("squadra.history",{list:[]}).list;
+  if(!H.length){$("histList").innerHTML='<p class="note" style="margin:0">Nessuna misura salvata. Completa una misurazione e tocca «Salva misura».</p>';return}
+  $("histList").innerHTML=H.map((h,i)=>`<div class="hist"><div><div><b>${esc(h.car||"Auto")}</b></div><div class="note">${new Date(h.t).toLocaleString("it-IT")}</div>
+   <div class="num" style="font-size:12px;margin-top:4px;color:var(--muted)">${["FL","FR","RL","RR"].map(k=>{const w=h.r.wheel[k]||{};return CORNERS[k].ab+" "+fmt(w.toe)+"/"+fmt(w.camber)}).join(" · ")}</div></div>
+   <div class="row" style="flex:none;flex-direction:column;gap:6px"><button class="btn" style="padding:7px 10px" data-load="${i}">Apri</button><button class="btn ghost" style="padding:7px 10px" data-del="${i}">Elimina</button></div></div>`).join("");
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------------- eventi ---------------- */
+document.addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.step){ ensureSensors(); openMeasure(b.dataset.step); }
+  if(b.hasAttribute("data-close")){ b.closest(".sheet").hidden=true; render(); }
+  if(b.dataset.load!=null){ const H=load("squadra.history",{list:[]}).list; const h=H[+b.dataset.load]; S=JSON.parse(JSON.stringify(h.state)); save(); $("history").hidden=true; render(); }
+  if(b.dataset.del!=null){ const H=load("squadra.history",{list:[]}); H.list.splice(+b.dataset.del,1); try{localStorage.setItem("squadra.history",JSON.stringify(H))}catch(e){} renderHist(); }
+});
+$("btnNext").onclick=()=>{ ensureSensors(); const fresh=!Object.keys(S.wheels).length&&!S.floor&&!S.center; const nx=flow().find(s=>!s.done&&!s.opt); if(fresh) openMeasure("floor"); else if(nx) openMeasure(nx.id); };
+$("mClose").onclick=closeMeasure;
+$("mGo").onclick=startCapture;
+$("mSkip").onclick=()=>{ const nx=nextAfter(MODE); nx?openMeasure(nx):closeMeasure() };
+function nextAfter(m){ if(m==="floor"&&!S.center) return "center"; const nx=flow().find(s=>!s.done&&!s.opt&&s.id!==m); return nx?nx.id:null; }
+$("btnString").onclick=()=>{$("string").hidden=false;renderString()};
+$("btnSet").onclick=()=>{$("settings").hidden=false;renderSettings()};
+$("btnHist").onclick=()=>{$("history").hidden=false;renderHist()};
+$("btnGuide").onclick=()=>{$("guide").hidden=false};
+$("btnReset").onclick=()=>{$("resetConfirm").hidden=false};
+$("resetNo").onclick=()=>{$("resetConfirm").hidden=true};
+$("resetYes").onclick=()=>{S={floor:null,center:null,wheels:{},check:null,car:S.car};save();$("resetConfirm").hidden=true;render()};
+$("btnSave").onclick=()=>{ if(!Object.keys(S.wheels).length) return; const H=load("squadra.history",{list:[]}); H.list.unshift({t:Date.now(),car:S.car,r:compute(),state:JSON.parse(JSON.stringify(S))}); try{localStorage.setItem("squadra.history",JSON.stringify(H))}catch(e){} $("btnSave").textContent="Salvata ✓"; setTimeout(()=>$("btnSave").textContent="Salva misura",1500); };
+$("carName").oninput=e=>{S.car=e.target.value;save()};
+$("uDeg").onclick=()=>{SET.unit="deg";save();render()};
+$("uMm").onclick=()=>{SET.unit="mm";save();render()};
+
+// demo (?demo) per vedere l'app senza sensori
+if(location.search.includes("demo")){
+  const t=Date.now(), sid=SID;
+  S={car:"Esempio",floor:{roll:0.15,t},center:{hn:180.0,t:t-1000,sid},check:{hn:180.33,t:t+120000,sid},
+     wheels:{FL:{camber:-0.95,hn:179.85,t,sid},FR:{camber:-1.35,hn:-0.05,t:t+30000,sid},RR:{camber:-1.6,hn:-0.12,t:t+60000,sid},RL:{camber:-1.2,hn:180.31,t:t+90000,sid}}};
+}
+if("serviceWorker" in navigator&&location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
+// prova ad agganciare i sensori su Android (su iPhone serve il tocco)
+try{ if(typeof DeviceOrientationEvent!=="undefined"&&typeof DeviceOrientationEvent.requestPermission!=="function"){window.addEventListener("deviceorientation",onOri);window._oriOn=true} }catch(e){}
+render();
+</script>
+</body>
+</html>
